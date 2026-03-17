@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Expense Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #1B4332;
+    --primary-light: #2D6A4F;
+    --primary-dark: #0B2117;
+    --accent: #40916C;
+    --bg: #0A0F0D;
+    --bg-card: #141E1A;
+    --bg-card-hover: #1A2922;
+    --text: #E8F0EC;
+    --text-muted: #8FA89A;
+    --text-dim: #5C7A6A;
+    --border: #1E3029;
+    --danger: #E63946;
+    --success: #40916C;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Screen management */
+  .screen { display: none; min-height: 100dvh; padding-bottom: 80px; animation: fadeIn 0.25s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; position: sticky; top: 0; z-index: 10;
+    background: var(--bg); backdrop-filter: blur(12px);
+  }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header-icon {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--bg-card); color: var(--text-muted); font-size: 18px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .header-icon:hover { background: var(--bg-card-hover); }
+
+  /* Summary cards */
+  .cards { display: flex; gap: 12px; padding: 8px 20px 20px; }
+  .card {
+    flex: 1; background: var(--bg-card); border-radius: var(--radius);
+    padding: 18px; border: 1px solid var(--border); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .card:active { transform: scale(0.97); }
+  .card-label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+  .card-amount { font-size: 26px; font-weight: 700; }
+  .card-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .card.family { border-left: 3px solid var(--accent); }
+  .card.personal { border-left: 3px solid #52B788; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--primary-dark); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 env(safe-area-inset-bottom, 8px); height: 64px;
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--text-dim); font-size: 10px;
+    font-weight: 500; cursor: pointer; padding: 4px 16px; font-family: inherit;
+    transition: color 0.2s;
+  }
+  .nav-item.active { color: #52B788; }
+  .nav-item svg { width: 22px; height: 22px; }
+
+  /* FAB */
+  .fab {
+    position: fixed; bottom: 74px; left: 50%; transform: translateX(-50%);
+    z-index: 101; width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #52B788);
+    border: none; color: white; font-size: 28px; font-weight: 300;
+    cursor: pointer; box-shadow: 0 4px 20px rgba(64,145,108,0.4);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .fab:active { transform: translateX(-50%) scale(0.92); }
+
+  /* Add expense screen */
+  .add-screen { background: var(--bg); }
+  .add-header {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+  }
+  .back-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--bg-card); color: var(--text); font-size: 20px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .add-header h2 { font-size: 18px; font-weight: 600; }
+
+  .form-group { padding: 0 20px; margin-bottom: 20px; }
+  .form-label { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-input {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px; color: var(--text);
+    font-size: 16px; font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text-dim); }
+  .form-input[type="date"] { color-scheme: dark; }
+  .amount-input { font-size: 32px; font-weight: 700; text-align: center; padding: 20px; }
+
+  /* Type toggle */
+  .type-toggle { display: flex; gap: 10px; padding: 0 20px; margin-bottom: 24px; }
+  .type-btn {
+    flex: 1; padding: 14px; border-radius: var(--radius-sm); border: 2px solid var(--border);
+    background: var(--bg-card); color: var(--text-muted); font-size: 15px;
+    font-weight: 600; cursor: pointer; text-align: center; font-family: inherit;
+    transition: all 0.2s;
+  }
+  .type-btn.active { border-color: var(--accent); color: var(--text); background: rgba(64,145,108,0.15); }
+
+  /* Category chips */
+  .category-section { padding: 0 20px; margin-bottom: 20px; }
+  .category-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chip {
+    padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text-muted); font-size: 13px;
+    cursor: pointer; font-family: inherit; transition: all 0.2s;
+  }
+  .chip.active { border-color: var(--accent); color: var(--text); background: rgba(64,145,108,0.2); }
+  .chip.ai-suggested { border-color: #52B788; position: relative; }
+  .chip.ai-suggested::before {
+    content: '✦'; margin-right: 4px; font-size: 10px; color: #52B788;
+  }
+  .ai-label { font-size: 11px; color: #52B788; margin-top: 6px; display: none; align-items: center; gap: 4px; }
+  .ai-label.show { display: flex; }
+
+  .save-btn {
+    margin: 10px 20px 30px; width: calc(100% - 40px); padding: 16px;
+    border-radius: var(--radius-sm); border: none;
+    background: linear-gradient(135deg, var(--accent), #52B788);
+    color: white; font-size: 16px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: opacity 0.2s;
+  }
+  .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .save-btn:active:not(:disabled) { opacity: 0.8; }
+
+  /* Expense list */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; position: sticky; top: 52px; background: var(--bg); z-index: 5;
+  }
+  .section-title { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+  .expense-list { padding: 0 20px; }
+  .expense-item {
+    display: flex; align-items: center; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .expense-info { flex: 1; }
+  .expense-desc { font-size: 15px; font-weight: 500; }
+  .expense-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .expense-amount { font-size: 16px; font-weight: 600; }
+
+  .total-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; margin: 0 20px 12px; background: var(--bg-card);
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+  }
+  .total-label { font-size: 14px; color: var(--text-muted); }
+  .total-amount { font-size: 22px; font-weight: 700; }
+
+  /* Action buttons */
+  .action-buttons { display: flex; gap: 10px; padding: 16px 20px; }
+  .action-btn {
+    flex: 1; padding: 14px; border-radius: var(--radius-sm); border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: opacity 0.2s;
+  }
+  .action-btn:active { opacity: 0.8; }
+  .action-btn.whatsapp { background: #25D366; color: white; }
+  .action-btn.settle { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+
+  /* Month selector */
+  .month-selector {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 12px 20px;
+  }
+  .month-nav {
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text); font-size: 16px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .month-label { font-size: 16px; font-weight: 600; min-width: 140px; text-align: center; }
+
+  /* Category breakdown */
+  .category-breakdown { padding: 0 20px; margin-bottom: 16px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .cat-name { font-size: 13px; width: 110px; flex-shrink: 0; color: var(--text-muted); }
+  .cat-bar-bg { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .cat-bar { height: 100%; background: linear-gradient(90deg, var(--accent), #52B788); border-radius: 4px; transition: width 0.5s ease; }
+  .cat-pct { font-size: 12px; color: var(--text-dim); width: 36px; text-align: right; }
+  .cat-amt { font-size: 13px; font-weight: 600; width: 70px; text-align: right; }
+
+  /* Settings */
+  .settings-screen { background: var(--bg); }
+  .settings-group { padding: 12px 20px; }
+  .settings-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 12px; }
+  .settings-input {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px; color: var(--text);
+    font-size: 14px; font-family: 'Inter', monospace; outline: none;
+  }
+  .settings-input:focus { border-color: var(--accent); }
+  .settings-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+  .settings-save {
+    margin: 12px 20px; width: calc(100% - 40px); padding: 14px;
+    border-radius: var(--radius-sm); border: none;
+    background: var(--accent); color: white; font-size: 15px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+  .empty-state p { font-size: 14px; margin-top: 8px; }
+  .empty-icon { font-size: 40px; opacity: 0.3; margin-bottom: 8px; }
+
+  /* Setup prompt */
+  .setup-prompt {
+    margin: 20px; padding: 20px; background: var(--bg-card); border-radius: var(--radius);
+    border: 1px solid var(--accent); text-align: center;
+  }
+  .setup-prompt p { font-size: 14px; color: var(--text-muted); margin-bottom: 14px; }
+  .setup-prompt button {
+    padding: 10px 24px; border-radius: var(--radius-sm); border: none;
+    background: var(--accent); color: white; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--text-dim); border-top-color: #52B788;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Loading overlay */
+  .loading-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 500;
+    background: transparent; pointer-events: none;
+  }
+  .loading-bar.active { background: var(--border); }
+  .loading-bar.active::after {
+    content: ''; display: block; height: 100%; width: 40%;
+    background: linear-gradient(90deg, var(--accent), #52B788);
+    border-radius: 2px; animation: loadSlide 1s ease-in-out infinite;
+  }
+  @keyframes loadSlide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: var(--bg-card); color: var(--text); padding: 12px 24px;
+    border-radius: 24px; font-size: 14px; font-weight: 500; z-index: 200;
+    border: 1px solid var(--border); opacity: 0; transition: all 0.3s ease;
+    pointer-events: none; max-width: 90%;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast.error { border-color: var(--danger); color: #FF8A8A; }
+
+  /* Confirm modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 300; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--bg-card); border-radius: var(--radius); padding: 24px;
+    max-width: 320px; width: 100%; border: 1px solid var(--border);
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 8px; }
+  .modal p { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-btn {
+    flex: 1; padding: 12px; border-radius: var(--radius-sm); border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .modal-btn.cancel { background: var(--border); color: var(--text); }
+  .modal-btn.confirm { background: var(--accent); color: white; }
+</style>
+</head>
+<body>
+
+<!-- Loading bar -->
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- HOME SCREEN -->
+<div id="home-screen" class="screen active">
+  <div class="header">
+    <h1>Expenses</h1>
+    <button class="header-icon" onclick="showScreen('settings')" aria-label="Settings">⚙</button>
+  </div>
+  <div id="home-setup-prompt" class="setup-prompt" style="display:none;">
+    <p>Set up your Google Apps Script URL to start tracking expenses.</p>
+    <button onclick="showScreen('settings')">Go to Settings</button>
+  </div>
+  <div class="cards">
+    <div class="card family" onclick="showScreen('family')">
+      <div class="card-label">Family</div>
+      <div class="card-amount" id="home-family-total">₹0</div>
+      <div class="card-sub">Unsettled</div>
+    </div>
+    <div class="card personal" onclick="showScreen('personal')">
+      <div class="card-label">Personal</div>
+      <div class="card-amount" id="home-personal-total">₹0</div>
+      <div class="card-sub">This month</div>
+    </div>
+  </div>
+  <div class="section-header"><span class="section-title">Recent</span></div>
+  <div class="expense-list" id="home-recent-list"></div>
+</div>
+
+<!-- ADD EXPENSE SCREEN -->
+<div id="add-screen" class="screen add-screen">
+  <div class="add-header">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h2>Add Expense</h2>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Amount</label>
+    <input type="number" id="add-amount" class="form-input amount-input" placeholder="₹0" inputmode="decimal" min="0">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Date</label>
+    <input type="date" id="add-date" class="form-input">
+  </div>
+  <div class="type-toggle">
+    <button class="type-btn active" data-type="family" onclick="setExpenseType('family')">Family</button>
+    <button class="type-btn" data-type="personal" onclick="setExpenseType('personal')">Personal</button>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Description</label>
+    <input type="text" id="add-desc" class="form-input" placeholder="What was this for?">
+  </div>
+  <div class="category-section" id="category-section" style="display:none;">
+    <label class="form-label">Category</label>
+    <div class="ai-label" id="ai-label"><span class="spinner"></span> AI suggesting...</div>
+    <div class="category-chips" id="category-chips"></div>
+  </div>
+  <button class="save-btn" id="save-btn" onclick="saveExpense()" disabled>Save Expense</button>
+</div>
+
+<!-- FAMILY SCREEN -->
+<div id="family-screen" class="screen">
+  <div class="header">
+    <h1>Family</h1>
+    <button class="header-icon" onclick="showScreen('home')" aria-label="Home">✕</button>
+  </div>
+  <div class="total-bar">
+    <span class="total-label">Unsettled Total</span>
+    <span class="total-amount" id="family-total">₹0</span>
+  </div>
+  <div class="action-buttons" id="family-actions" style="display:none;">
+    <button class="action-btn whatsapp" onclick="shareWhatsApp()">📱 Share with Father</button>
+    <button class="action-btn settle" onclick="confirmSettle()">✓ Settle</button>
+  </div>
+  <div class="expense-list" id="family-list"></div>
+  <div class="empty-state" id="family-empty">
+    <div class="empty-icon">✓</div>
+    <p>All settled! No pending expenses.</p>
+  </div>
+</div>
+
+<!-- PERSONAL SCREEN -->
+<div id="personal-screen" class="screen">
+  <div class="header">
+    <h1>Personal</h1>
+    <button class="header-icon" onclick="showScreen('home')" aria-label="Home">✕</button>
+  </div>
+  <div class="month-selector">
+    <button class="month-nav" onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="month-label"></span>
+    <button class="month-nav" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="total-bar">
+    <span class="total-label">Monthly Total</span>
+    <span class="total-amount" id="personal-total">₹0</span>
+  </div>
+  <div class="category-breakdown" id="personal-breakdown"></div>
+  <div class="section-header"><span class="section-title">Expenses</span></div>
+  <div class="expense-list" id="personal-list"></div>
+  <div class="empty-state" id="personal-empty" style="display:none;">
+    <div class="empty-icon">📝</div>
+    <p>No expenses this month</p>
+  </div>
+</div>
+
+<!-- SETTINGS SCREEN -->
+<div id="settings-screen" class="screen settings-screen">
+  <div class="add-header">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h2>Settings</h2>
+  </div>
+  <div class="settings-group">
+    <div class="settings-label">Google Apps Script URL</div>
+    <input type="url" id="gas-url-input" class="settings-input" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="settings-hint">Your deployed Google Apps Script Web App URL. All expense data is stored in Google Sheets.</div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-label">Claude API Key</div>
+    <input type="password" id="api-key-input" class="settings-input" placeholder="sk-ant-...">
+    <div class="settings-hint">Used for AI expense categorisation. Optional — you can pick categories manually.</div>
+  </div>
+  <button class="settings-save" onclick="saveSettings()">Save Settings</button>
+</div>
+
+<!-- Bottom Nav -->
+<button class="fab" onclick="showScreen('add')" aria-label="Add expense">+</button>
+<nav class="bottom-nav">
+  <button class="nav-item active" data-screen="home" onclick="showScreen('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+    Home
+  </button>
+  <button class="nav-item" data-screen="family" onclick="showScreen('family')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Family
+  </button>
+  <button class="nav-item" data-screen="personal" onclick="showScreen('personal')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Personal
+  </button>
+</nav>
+
+<!-- Settle confirm modal -->
+<div class="modal-overlay" id="settle-modal">
+  <div class="modal">
+    <h3>Mark as Settled?</h3>
+    <p>This will archive all current family expenses and start a fresh cycle.</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="settleExpenses()">Settle</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // --- Constants ---
+  const CATEGORIES = [
+    'Groceries', 'Fuel', 'Utilities', 'Medical', 'Education',
+    'Dining Out', 'Shopping', 'Entertainment', 'Subscriptions',
+    'Home Supplies', 'Repairs & Maintenance',
+    'Charity / Zakat', 'Miscellaneous'
+  ];
+
+  // --- In-memory expense cache ---
+  let allExpenses = [];
+
+  // --- Google Sheets API ---
+  function getGasUrl() {
+    return localStorage.getItem('gas_url') || '';
+  }
+
+  function showLoading(on) {
+    document.getElementById('loading-bar').classList.toggle('active', on);
+  }
+
+  async function gasCall(payload) {
+    const url = getGasUrl();
+    if (!url) throw new Error('Apps Script URL not configured');
+    showLoading(true);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      return data;
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function fetchExpenses() {
+    try {
+      const data = await gasCall({ action: 'getExpenses' });
+      if (data && Array.isArray(data.expenses)) {
+        allExpenses = data.expenses.map(e => ({
+          ...e,
+          amount: parseFloat(e.amount) || 0,
+          settled: e.settled === 'settled' || e.settled === true
+        }));
+      }
+    } catch (err) {
+      showToast('Failed to load expenses', true);
+    }
+  }
+
+  async function postExpense(expense) {
+    await gasCall({
+      action: 'addExpense',
+      ...expense,
+      settled: 'unsettled'
+    });
+  }
+
+  async function postSettle(ids, total) {
+    await gasCall({
+      action: 'settleExpenses',
+      ids: ids,
+      total: total
+    });
+  }
+
+  // --- Screen nav ---
+  let currentScreen = 'home';
+  let previousScreen = 'home';
+
+  function showScreen(name) {
+    if (name === currentScreen) return;
+    previousScreen = currentScreen;
+    currentScreen = name;
+
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(name + '-screen').classList.add('active');
+
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.toggle('active', n.dataset.screen === name);
+    });
+
+    const fab = document.querySelector('.fab');
+    fab.style.display = (name === 'add' || name === 'settings') ? 'none' : 'flex';
+
+    if (name === 'home') refreshHome();
+    if (name === 'family') refreshFamily();
+    if (name === 'personal') refreshPersonal();
+    if (name === 'add') resetAddForm();
+    if (name === 'settings') loadSettings();
+  }
+
+  function goBack() {
+    showScreen(previousScreen || 'home');
+  }
+
+  // --- Home ---
+  function refreshHome() {
+    const gasUrl = getGasUrl();
+    document.getElementById('home-setup-prompt').style.display = gasUrl ? 'none' : 'block';
+
+    const unsettledFamily = allExpenses.filter(e => e.type === 'family' && !e.settled);
+    const familyTotal = unsettledFamily.reduce((s, e) => s + e.amount, 0);
+    document.getElementById('home-family-total').textContent = '₹' + familyTotal.toLocaleString('en-IN');
+
+    const now = new Date();
+    const thisMonth = allExpenses.filter(e =>
+      e.type === 'personal' &&
+      new Date(e.date).getMonth() === now.getMonth() &&
+      new Date(e.date).getFullYear() === now.getFullYear()
+    );
+    const personalTotal = thisMonth.reduce((s, e) => s + e.amount, 0);
+    document.getElementById('home-personal-total').textContent = '₹' + personalTotal.toLocaleString('en-IN');
+
+    const recent = [...allExpenses]
+      .filter(e => !e.settled)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10);
+    const list = document.getElementById('home-recent-list');
+    if (recent.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p>No expenses yet. Tap + to add one.</p></div>';
+    } else {
+      list.innerHTML = recent.map(e => expenseItemHTML(e)).join('');
+    }
+  }
+
+  function expenseItemHTML(e) {
+    const d = new Date(e.date);
+    const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const typeLabel = e.type === 'family' ? 'Family' : (e.category || 'Personal');
+    return `<div class="expense-item">
+      <div class="expense-info">
+        <div class="expense-desc">${esc(e.description)}</div>
+        <div class="expense-meta">${dateStr} · ${typeLabel}</div>
+      </div>
+      <div class="expense-amount">₹${e.amount.toLocaleString('en-IN')}</div>
+    </div>`;
+  }
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  // --- Add expense ---
+  let expenseType = 'family';
+  let selectedCategory = '';
+  let aiSuggestedCategory = '';
+  let debounceTimer = null;
+  let isSaving = false;
+
+  function resetAddForm() {
+    document.getElementById('add-amount').value = '';
+    document.getElementById('add-desc').value = '';
+    document.getElementById('add-date').value = new Date().toISOString().split('T')[0];
+    setExpenseType('family');
+    selectedCategory = '';
+    aiSuggestedCategory = '';
+    isSaving = false;
+    updateSaveBtn();
+  }
+
+  function setExpenseType(type) {
+    expenseType = type;
+    document.querySelectorAll('.type-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.type === type);
+    });
+    document.getElementById('category-section').style.display = type === 'personal' ? 'block' : 'none';
+    if (type === 'personal') renderCategoryChips();
+    updateSaveBtn();
+  }
+
+  function renderCategoryChips() {
+    const container = document.getElementById('category-chips');
+    container.innerHTML = CATEGORIES.map(c => {
+      const isAI = c === aiSuggestedCategory;
+      const isActive = c === selectedCategory;
+      return `<button class="chip${isActive ? ' active' : ''}${isAI ? ' ai-suggested' : ''}"
+        onclick="selectCategory('${c}')">${esc(c)}</button>`;
+    }).join('');
+  }
+
+  function selectCategory(cat) {
+    selectedCategory = cat;
+    renderCategoryChips();
+    updateSaveBtn();
+  }
+
+  function updateSaveBtn() {
+    const amount = parseFloat(document.getElementById('add-amount').value);
+    const desc = document.getElementById('add-desc').value.trim();
+    const catOk = expenseType === 'family' || selectedCategory;
+    const btn = document.getElementById('save-btn');
+    btn.disabled = !(amount > 0 && desc && catOk) || isSaving;
+    btn.textContent = isSaving ? 'Saving...' : 'Save Expense';
+  }
+
+  // AI categorisation
+  document.getElementById('add-desc').addEventListener('input', function() {
+    updateSaveBtn();
+    if (expenseType !== 'personal') return;
+    clearTimeout(debounceTimer);
+    const desc = this.value.trim();
+    if (!desc) {
+      document.getElementById('ai-label').classList.remove('show');
+      return;
+    }
+    debounceTimer = setTimeout(() => aiCategorise(desc), 800);
+  });
+  document.getElementById('add-amount').addEventListener('input', updateSaveBtn);
+
+  async function aiCategorise(description) {
+    const apiKey = localStorage.getItem('claude_api_key');
+    if (!apiKey) return;
+
+    const aiLabel = document.getElementById('ai-label');
+    aiLabel.innerHTML = '<span class="spinner"></span> AI suggesting...';
+    aiLabel.classList.add('show');
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 50,
+          messages: [{
+            role: 'user',
+            content: `Categorise this expense into exactly one of these categories: ${CATEGORIES.join(', ')}.\n\nExpense description: "${description}"\n\nRespond with ONLY the category name, nothing else.`
+          }]
+        })
+      });
+      const data = await res.json();
+      const suggestion = data.content?.[0]?.text?.trim();
+      if (suggestion && CATEGORIES.includes(suggestion)) {
+        aiSuggestedCategory = suggestion;
+        if (!selectedCategory) selectedCategory = suggestion;
+        aiLabel.innerHTML = '✦ AI suggested: ' + esc(suggestion);
+        renderCategoryChips();
+        updateSaveBtn();
+      } else {
+        aiLabel.classList.remove('show');
+      }
+    } catch {
+      aiLabel.classList.remove('show');
+    }
+  }
+
+  async function saveExpense() {
+    if (isSaving) return;
+    const amount = parseFloat(document.getElementById('add-amount').value);
+    const desc = document.getElementById('add-desc').value.trim();
+    if (!amount || !desc) return;
+    if (!getGasUrl()) { showToast('Set up Apps Script URL first', true); return; }
+
+    const dateVal = document.getElementById('add-date').value;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+    const expense = {
+      id: id,
+      date: dateVal || new Date().toISOString().split('T')[0],
+      type: expenseType,
+      amount: amount,
+      description: desc,
+      category: expenseType === 'personal' ? selectedCategory : ''
+    };
+
+    isSaving = true;
+    updateSaveBtn();
+
+    try {
+      await postExpense(expense);
+      // Add to local cache
+      allExpenses.push({
+        ...expense,
+        settled: false
+      });
+      showToast('Expense saved');
+      showScreen('home');
+    } catch (err) {
+      showToast('Failed to save expense', true);
+      isSaving = false;
+      updateSaveBtn();
+    }
+  }
+
+  // --- Family ---
+  function refreshFamily() {
+    const expenses = allExpenses.filter(e => e.type === 'family' && !e.settled);
+    const total = expenses.reduce((s, e) => s + e.amount, 0);
+    document.getElementById('family-total').textContent = '₹' + total.toLocaleString('en-IN');
+
+    const list = document.getElementById('family-list');
+    const empty = document.getElementById('family-empty');
+    const actions = document.getElementById('family-actions');
+
+    if (expenses.length === 0) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      actions.style.display = 'none';
+    } else {
+      empty.style.display = 'none';
+      actions.style.display = 'flex';
+      const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+      list.innerHTML = sorted.map(e => expenseItemHTML(e)).join('');
+    }
+  }
+
+  function shareWhatsApp() {
+    const expenses = allExpenses.filter(e => e.type === 'family' && !e.settled);
+    if (!expenses.length) return;
+
+    const sorted = [...expenses].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const total = sorted.reduce((s, e) => s + e.amount, 0);
+    const startDate = new Date(sorted[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const endDate = new Date(sorted[sorted.length - 1].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+    let msg = `Family Expenses – ${startDate} to ${endDate}\n`;
+    sorted.forEach((e, i) => {
+      const d = new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      msg += `${i + 1}. ${d} ${e.description} ₹${e.amount.toLocaleString('en-IN')}\n`;
+    });
+    msg += `\nTotal: ₹${total.toLocaleString('en-IN')}`;
+
+    window.open('https://wa.me/?text=' + encodeURIComponent(msg));
+  }
+
+  function confirmSettle() {
+    document.getElementById('settle-modal').classList.add('show');
+  }
+
+  async function settleExpenses() {
+    const unsettled = allExpenses.filter(e => e.type === 'family' && !e.settled);
+    if (!unsettled.length) { closeModal(); return; }
+
+    const ids = unsettled.map(e => e.id);
+    const total = unsettled.reduce((s, e) => s + e.amount, 0);
+
+    closeModal();
+
+    try {
+      await postSettle(ids, total);
+      // Update local cache
+      allExpenses.forEach(e => {
+        if (ids.includes(e.id)) e.settled = true;
+      });
+      showToast('Expenses settled');
+      refreshFamily();
+    } catch (err) {
+      showToast('Failed to settle expenses', true);
+    }
+  }
+
+  // --- Personal ---
+  let personalMonth = new Date().getMonth();
+  let personalYear = new Date().getFullYear();
+
+  function refreshPersonal() {
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('month-label').textContent = monthNames[personalMonth] + ' ' + personalYear;
+
+    const expenses = allExpenses.filter(e => {
+      if (e.type !== 'personal') return false;
+      const d = new Date(e.date);
+      return d.getMonth() === personalMonth && d.getFullYear() === personalYear;
+    });
+
+    const total = expenses.reduce((s, e) => s + e.amount, 0);
+    document.getElementById('personal-total').textContent = '₹' + total.toLocaleString('en-IN');
+
+    const empty = document.getElementById('personal-empty');
+    const breakdown = document.getElementById('personal-breakdown');
+    const list = document.getElementById('personal-list');
+
+    if (expenses.length === 0) {
+      empty.style.display = 'block';
+      breakdown.innerHTML = '';
+      list.innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
+
+    // Category breakdown
+    const catTotals = {};
+    expenses.forEach(e => {
+      const c = e.category || 'Miscellaneous';
+      catTotals[c] = (catTotals[c] || 0) + e.amount;
+    });
+    const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+    const maxAmt = sorted[0]?.[1] || 1;
+
+    breakdown.innerHTML = sorted.map(([cat, amt]) => {
+      const pct = total > 0 ? Math.round(amt / total * 100) : 0;
+      const barW = Math.round(amt / maxAmt * 100);
+      return `<div class="cat-row">
+        <span class="cat-name">${esc(cat)}</span>
+        <div class="cat-bar-bg"><div class="cat-bar" style="width:${barW}%"></div></div>
+        <span class="cat-pct">${pct}%</span>
+        <span class="cat-amt">₹${amt.toLocaleString('en-IN')}</span>
+      </div>`;
+    }).join('');
+
+    const expSorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    list.innerHTML = expSorted.map(e => expenseItemHTML(e)).join('');
+  }
+
+  function changeMonth(delta) {
+    personalMonth += delta;
+    if (personalMonth > 11) { personalMonth = 0; personalYear++; }
+    if (personalMonth < 0) { personalMonth = 11; personalYear--; }
+    refreshPersonal();
+  }
+
+  // --- Settings ---
+  function loadSettings() {
+    document.getElementById('gas-url-input').value = localStorage.getItem('gas_url') || '';
+    document.getElementById('api-key-input').value = localStorage.getItem('claude_api_key') || '';
+  }
+
+  async function saveSettings() {
+    const gasUrl = document.getElementById('gas-url-input').value.trim();
+    const apiKey = document.getElementById('api-key-input').value.trim();
+
+    if (gasUrl) {
+      localStorage.setItem('gas_url', gasUrl);
+    } else {
+      localStorage.removeItem('gas_url');
+    }
+
+    if (apiKey) {
+      localStorage.setItem('claude_api_key', apiKey);
+    } else {
+      localStorage.removeItem('claude_api_key');
+    }
+
+    showToast('Settings saved');
+
+    // If we just set the URL, fetch expenses
+    if (gasUrl) {
+      await fetchExpenses();
+    }
+
+    goBack();
+  }
+
+  // --- Utils ---
+  function closeModal() {
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+  }
+
+  function showToast(msg, isError) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(() => { t.className = 'toast'; }, 2500);
+  }
+
+  // --- Init ---
+  async function init() {
+    if (getGasUrl()) {
+      await fetchExpenses();
+    }
+    refreshHome();
+  }
+
+  init();
+</script>
+</body>
+</html>
