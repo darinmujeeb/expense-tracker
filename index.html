@@ -238,6 +238,66 @@
     font-weight: 600; cursor: pointer; font-family: inherit;
   }
 
+  /* Budget dashboard */
+  .budget-header-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px 12px;
+  }
+  .budget-total-label { font-size: 13px; color: var(--text-muted); }
+  .budget-total-amount { font-size: 20px; font-weight: 700; }
+  .budget-total-amount.surplus { color: #52B788; }
+  .budget-total-amount.deficit { color: var(--danger); }
+
+  .budget-buckets { padding: 0 20px; }
+  .budget-bucket {
+    background: var(--bg-card); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border);
+  }
+  .budget-bucket.exceeded { border-color: var(--danger); }
+  .bucket-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .bucket-name { font-size: 14px; font-weight: 600; }
+  .bucket-amounts { font-size: 13px; color: var(--text-muted); text-align: right; }
+  .bucket-amounts .spent { font-weight: 600; color: var(--text); }
+  .bucket-amounts .exceeded-text { color: var(--danger); }
+  .bucket-bar-bg {
+    height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .bucket-bar {
+    height: 100%; border-radius: 4px; transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--accent), #52B788);
+  }
+  .bucket-bar.over { background: linear-gradient(90deg, #E63946, #FF6B6B); }
+  .bucket-remaining {
+    font-size: 12px; color: var(--text-dim); margin-top: 6px;
+  }
+  .bucket-remaining.over { color: var(--danger); }
+  .bucket-tag {
+    font-size: 10px; color: var(--text-dim); background: var(--border);
+    padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+  }
+
+  .budget-edit-link {
+    font-size: 13px; color: var(--accent); background: none; border: none;
+    cursor: pointer; font-family: inherit; font-weight: 500;
+  }
+
+  /* Budget edit modal */
+  .budget-edit-form { padding: 0 20px; }
+  .budget-field {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .budget-field-label { font-size: 14px; font-weight: 500; }
+  .budget-field-input {
+    width: 100px; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text);
+    font-size: 15px; font-family: inherit; text-align: right; outline: none;
+  }
+  .budget-field-input:focus { border-color: var(--accent); }
+
   /* Empty state */
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
   .empty-state p { font-size: 14px; margin-top: 8px; }
@@ -417,6 +477,32 @@
   </div>
 </div>
 
+<!-- BUDGET SCREEN -->
+<div id="budget-screen" class="screen">
+  <div class="header">
+    <h1>Budget</h1>
+    <button class="header-icon" onclick="showScreen('home')" aria-label="Home">✕</button>
+  </div>
+  <div class="month-selector">
+    <button class="month-nav" onclick="changeBudgetMonth(-1)">‹</button>
+    <span class="month-label" id="budget-month-label"></span>
+    <button class="month-nav" onclick="changeBudgetMonth(1)">›</button>
+  </div>
+  <div class="budget-header-row">
+    <span class="budget-total-label">Surplus this month</span>
+    <span class="budget-total-amount" id="budget-surplus">₹0</span>
+  </div>
+  <div class="budget-header-row">
+    <span class="budget-total-label">Monthly Budget</span>
+    <button class="budget-edit-link" id="budget-edit-toggle" onclick="toggleBudgetEdit()">Edit</button>
+  </div>
+  <div id="budget-edit-section" style="display:none;">
+    <div class="budget-edit-form" id="budget-edit-form"></div>
+    <button class="save-btn" style="margin-top:12px;" onclick="saveBudgetConfig()">Save Budget</button>
+  </div>
+  <div class="budget-buckets" id="budget-buckets"></div>
+</div>
+
 <!-- SETTINGS SCREEN -->
 <div id="settings-screen" class="screen settings-screen">
   <div class="add-header">
@@ -450,6 +536,10 @@
   <button class="nav-item" data-screen="personal" onclick="showScreen('personal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     Personal
+  </button>
+  <button class="nav-item" data-screen="budget" onclick="showScreen('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20"/><path d="M9 21V9"/></svg>
+    Budget
   </button>
 </nav>
 
@@ -554,12 +644,13 @@
     });
 
     const fab = document.querySelector('.fab');
-    fab.style.display = (name === 'add' || name === 'settings') ? 'none' : 'flex';
+    fab.style.display = (name === 'add' || name === 'settings' || name === 'budget') ? 'none' : 'flex';
 
     if (name === 'home') refreshHome();
     if (name === 'family') refreshFamily();
     if (name === 'personal') refreshPersonal();
     if (name === 'add') resetAddForm();
+    if (name === 'budget') refreshBudget();
     if (name === 'settings') loadSettings();
   }
 
@@ -920,6 +1011,148 @@
     }
 
     goBack();
+  }
+
+  // --- Budget Dashboard ---
+  const DEFAULT_BUCKETS = [
+    { key: 'needs', name: 'Needs', amount: 15000, type: 'tracked' },
+    { key: 'wants', name: 'Wants', amount: 4000, type: 'tracked' },
+    { key: 'debt', name: 'Debt Repayment', amount: 4000, type: 'fixed' },
+    { key: 'investments', name: 'Investments', amount: 5000, type: 'fixed' },
+    { key: 'buffer', name: 'Buffer', amount: 2000, type: 'fixed' }
+  ];
+
+  const CATEGORY_TO_BUCKET = {
+    'Groceries': 'needs', 'Fuel': 'needs', 'Utilities': 'needs',
+    'Medical': 'needs', 'Education': 'needs', 'Home Supplies': 'needs',
+    'Repairs & Maintenance': 'needs',
+    'Dining Out': 'wants', 'Shopping': 'wants', 'Entertainment': 'wants',
+    'Subscriptions': 'wants', 'Charity / Zakat': 'wants', 'Miscellaneous': 'wants'
+  };
+
+  let budgetMonth = new Date().getMonth();
+  let budgetYear = new Date().getFullYear();
+  let budgetEditOpen = false;
+
+  function getBudgetConfig() {
+    const saved = localStorage.getItem('budget_config');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return DEFAULT_BUCKETS.map(b => ({ ...b }));
+  }
+
+  function saveBudgetConfigToStorage(config) {
+    localStorage.setItem('budget_config', JSON.stringify(config));
+  }
+
+  function changeBudgetMonth(delta) {
+    budgetMonth += delta;
+    if (budgetMonth > 11) { budgetMonth = 0; budgetYear++; }
+    if (budgetMonth < 0) { budgetMonth = 11; budgetYear--; }
+    refreshBudget();
+  }
+
+  function refreshBudget() {
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('budget-month-label').textContent = monthNames[budgetMonth] + ' ' + budgetYear;
+
+    const config = getBudgetConfig();
+    const totalBudget = config.reduce((s, b) => s + b.amount, 0);
+
+    // Get personal expenses for the selected month
+    const monthExpenses = allExpenses.filter(e => {
+      if (e.type !== 'personal') return false;
+      const d = new Date(e.date);
+      return d.getMonth() === budgetMonth && d.getFullYear() === budgetYear;
+    });
+
+    // Sum expenses per bucket
+    const bucketSpent = {};
+    config.forEach(b => { bucketSpent[b.key] = 0; });
+    monthExpenses.forEach(e => {
+      const bucket = CATEGORY_TO_BUCKET[e.category] || 'wants';
+      if (bucketSpent[bucket] !== undefined) {
+        bucketSpent[bucket] += e.amount;
+      }
+    });
+
+    // For fixed buckets, mark as fully spent (auto-filled)
+    config.forEach(b => {
+      if (b.type === 'fixed') bucketSpent[b.key] = b.amount;
+    });
+
+    const totalSpent = config.reduce((s, b) => {
+      return s + (b.type === 'fixed' ? b.amount : bucketSpent[b.key]);
+    }, 0);
+    const surplus = totalBudget - totalSpent;
+
+    const surplusEl = document.getElementById('budget-surplus');
+    surplusEl.textContent = (surplus >= 0 ? '₹' : '-₹') + Math.abs(surplus).toLocaleString('en-IN');
+    surplusEl.className = 'budget-total-amount ' + (surplus >= 0 ? 'surplus' : 'deficit');
+
+    // Render buckets
+    const container = document.getElementById('budget-buckets');
+    container.innerHTML = config.map(b => {
+      const spent = bucketSpent[b.key];
+      const remaining = b.amount - spent;
+      const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0;
+      const exceeded = spent > b.amount;
+      const isFixed = b.type === 'fixed';
+
+      return `<div class="budget-bucket${exceeded ? ' exceeded' : ''}">
+        <div class="bucket-top">
+          <span class="bucket-name">${esc(b.name)}${isFixed ? '<span class="bucket-tag">Auto</span>' : ''}</span>
+          <span class="bucket-amounts">
+            <span class="spent${exceeded ? ' exceeded-text' : ''}">₹${spent.toLocaleString('en-IN')}</span>
+            <span> / ₹${b.amount.toLocaleString('en-IN')}</span>
+          </span>
+        </div>
+        <div class="bucket-bar-bg">
+          <div class="bucket-bar${exceeded ? ' over' : ''}" style="width:${pct}%"></div>
+        </div>
+        <div class="bucket-remaining${exceeded ? ' over' : ''}">
+          ${isFixed ? 'Fixed monthly allocation' :
+            (exceeded ? 'Over by ₹' + Math.abs(remaining).toLocaleString('en-IN') :
+              '₹' + remaining.toLocaleString('en-IN') + ' remaining')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function toggleBudgetEdit() {
+    budgetEditOpen = !budgetEditOpen;
+    const section = document.getElementById('budget-edit-section');
+    const toggle = document.getElementById('budget-edit-toggle');
+    section.style.display = budgetEditOpen ? 'block' : 'none';
+    toggle.textContent = budgetEditOpen ? 'Cancel' : 'Edit';
+
+    if (budgetEditOpen) {
+      const config = getBudgetConfig();
+      const form = document.getElementById('budget-edit-form');
+      form.innerHTML = config.map(b => `
+        <div class="budget-field">
+          <span class="budget-field-label">${esc(b.name)}</span>
+          <input type="number" class="budget-field-input" data-bucket="${b.key}"
+            value="${b.amount}" inputmode="numeric" min="0">
+        </div>
+      `).join('');
+    }
+  }
+
+  function saveBudgetConfig() {
+    const config = getBudgetConfig();
+    document.querySelectorAll('.budget-field-input').forEach(input => {
+      const key = input.dataset.bucket;
+      const bucket = config.find(b => b.key === key);
+      if (bucket) bucket.amount = Math.max(0, parseInt(input.value) || 0);
+    });
+    saveBudgetConfigToStorage(config);
+    budgetEditOpen = false;
+    document.getElementById('budget-edit-section').style.display = 'none';
+    document.getElementById('budget-edit-toggle').textContent = 'Edit';
+    refreshBudget();
+    showToast('Budget updated');
   }
 
   // --- Utils ---
